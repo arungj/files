@@ -1,0 +1,109 @@
+import sys
+import os
+import glob
+import zipfile
+import errno
+import shutil
+
+importstr = "#import"
+propsfile = "hy5test.properties"
+propskey = "launcherScript"
+zipfolder = "zipped"
+dummyfolder = "dummy"
+
+mainDir = sys.argv[1]
+commonDir = sys.argv[2]
+print "main dir\n",mainDir
+print "common dir",commonDir
+print "\n"
+
+def parsejs(filename):
+ "this function parse jsfile and stores all imported js files into a list."
+ print "inside parsejs"
+ crs = open(mainfiles[1], "r")
+ importlist = []    # better performance than list()
+ print "length:",len(importlist)
+ for row in crs:
+    #print "row:", row
+    stripstring = row.strip();
+    if stripstring.startswith(importstr):
+        print "import found:", stripstring
+        splitlist = stripstring.split("\"")
+        print "file is:", splitlist[1]
+        if splitlist[1] != "Hy5Test.js":
+            importlist.append(splitlist[1])
+ return importlist
+
+def createfolder(name):
+    folderpath = os.path.join(mainDir, name);
+    try:
+        os.mkdir(folderpath);
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+    return folderpath
+
+
+def createprops(mainjsname, filename):
+    "creates hy5test.properties file for current main.js"
+    myfile = open(os.path.join(mainDir, dummyfolder, filename)+"/"+propsfile, "w")
+    myfile.write(propskey+"="+mainjsname)
+    myfile.close()
+
+def copyallfiles(mainjsname, commonjslist):
+    "creates script folder and copy all js files to it."
+    lngth = len(mainjsname)
+    filename = mainjsname[0:lngth-3]
+    print "name aftr striping:", filename
+    dstfldr = createfolder(os.path.join(dummyfolder, filename));
+    createprops(mainjsname, filename);
+    shutil.copy(os.path.join(mainDir, mainjsname), dstfldr)
+    
+    for jss in commonjslist:
+        commonpath = os.path.join(commonDir, jss)
+        if (os.path.isfile(commonpath)):
+            shutil.copy(commonpath, dstfldr)
+        else:
+            print "copy failed:", commonpath
+    
+    return filename
+
+def createzip(foldr):
+    "pack common js, main js and hy5test.properties to a folder and zip."
+    print "foldr:", foldr
+    #z = zipfile.ZipFile(os.path.join(zipfolder, foldr+ ".zip") ,"w");
+    #create date folder.
+    shutil.make_archive(os.path.join(zipfolder, foldr), format="zip", root_dir=dummyfolder)
+
+def parsealljs():
+ "create zip files after parsing and copying all js"
+ print "main files", mainfiles
+ for jsfile in mainfiles:
+    print "jsf", jsfile
+    importjslist = parsejs(jsfile);
+    print "importlis:", importjslist
+    if len(importjslist) > 0:
+        scriptsfolder = copyallfiles(jsfile, importjslist);
+        createzip(scriptsfolder);
+        shutil.rmtree(os.path.join(dummyfolder, scriptsfolder))
+            
+def readmaincommon():
+    #reading common js files to a list.
+    os.chdir(commonDir)
+    global commonfiles  #should be declared before use.
+    commonfiles = glob.glob('*.js')
+    print "commn length:",len(commonfiles)
+    #print "first:", commonfiles[1]
+
+    #reading main js files to a list.
+    os.chdir(mainDir)
+    global mainfiles
+    mainfiles = [f for f in os.listdir(mainDir) if f.endswith('.js')]
+    print "main length:",len(mainfiles)
+    #print "first:", mainfiles[1]
+
+readmaincommon();
+createfolder(zipfolder);
+createfolder(dummyfolder);
+parsealljs();
+shutil.rmtree(dummyfolder)
